@@ -1043,7 +1043,7 @@ Expand_Constant_Multiply (TN *result, TN *var_tn, TARG_INT constant, TYPE_ID mty
       Expand_Shift(result, x, Gen_Literal_TN(first_1, 4), mtype, shift_left, ops);
       return TRUE;
     } else {
-      TN *x1 = Dup_TN(x);
+      TN *x1 = DUP_TN(x);
       Expand_Shift(x1, x, Gen_Literal_TN(first_1, 4), MTYPE_I8, shift_left, ops);
       x = x1;
     }
@@ -1056,12 +1056,12 @@ Expand_Constant_Multiply (TN *result, TN *var_tn, TARG_INT constant, TYPE_ID mty
   // with the optimized sequences.
   //
   if (uc == ((1<<num_ones)-1) && uc > 63) {
-    TN *r1 = Dup_TN(result);
+    TN *r1 = DUP_TN(result);
     Expand_Shift(r1, x, Gen_Literal_TN(num_ones, 4), MTYPE_I8, shift_left, ops);
     if (!needs_sign_extension) {
       Expand_Sub(result,r1,x,mtype,ops);
     } else {
-      TN *r2 = Dup_TN(result);
+      TN *r2 = DUP_TN(result);
       Expand_Sub(r2,r1,x,mtype,ops);
       Fixup_32_Bit_Op(result,r2,mtype,ops);
     }
@@ -1077,7 +1077,7 @@ Expand_Constant_Multiply (TN *result, TN *var_tn, TARG_INT constant, TYPE_ID mty
     INT mpy=fast_mpys[i];
     if (uc%mpy == 0 && uc/mpy <= 63) {
       INT64 uc1;
-      TN *r1 = Dup_TN(result);
+      TN *r1 = DUP_TN(result);
       Expand_Small_Multiply(r1,x,uc/mpy,ops);
       Expand_Constant_Multiply(result,r1,mpy,mtype,ops);
       return TRUE;
@@ -1089,7 +1089,7 @@ Expand_Constant_Multiply (TN *result, TN *var_tn, TARG_INT constant, TYPE_ID mty
   //
   TN *r = result;
   if (needs_sign_extension) {
-    r = Dup_TN(result);
+    r = DUP_TN(result);
   }
   // 
   // If the remaining number is less than 16 bits, we will do it by
@@ -1101,7 +1101,7 @@ Expand_Constant_Multiply (TN *result, TN *var_tn, TARG_INT constant, TYPE_ID mty
     Expand_Small_Multiply(r,x,uc,ops);
   } else if (uc <= 1023) {
     INT64 uc1,uc2;
-    TN *r1 = Dup_TN(result);
+    TN *r1 = DUP_TN(result);
     // Do in group of 4 and at most 6
     // Note that uc2 >= 4 (or we would have been in the above case)
     uc1 = uc & 15;
@@ -1115,7 +1115,7 @@ Expand_Constant_Multiply (TN *result, TN *var_tn, TARG_INT constant, TYPE_ID mty
     } else if (uc1 == uc2) {
       shladd(r,r1,4,r1,ops);
     } else {
-      TN *r2 = Dup_TN(result);
+      TN *r2 = DUP_TN(result);
       Expand_Small_Multiply(r2,x,uc1,ops);
       shladd(r,r1,4,r2,ops);
     }
@@ -1128,8 +1128,8 @@ Expand_Constant_Multiply (TN *result, TN *var_tn, TARG_INT constant, TYPE_ID mty
     // we get it for free. 
     //
     INT64 uc1,uc2;
-    TN *r1 = Dup_TN(result);
-    TN *r2 = Dup_TN(result);
+    TN *r1 = DUP_TN(result);
+    TN *r2 = DUP_TN(result);
     uc1 = uc & 255;
     uc2 = uc >> 8;
     Expand_Constant_Multiply (r1, x, uc2, MTYPE_I8, ops);
@@ -1161,21 +1161,21 @@ Expand_Constant_Multiply (TN *result, TN *var_tn, TARG_INT constant, TYPE_ID mty
       shladd(r,r2,4,r1,ops);
 
     } else if (uc1%16 == 0) {
-      TN *r3 = Dup_TN(result);
+      TN *r3 = DUP_TN(result);
       uc1 /= 16;
       Expand_Constant_Multiply(r3,x,uc1,MTYPE_I8,ops);
       shladd(r2,r1,4,r3,ops);
       shladd(r,r2,4,Zero_TN,ops);
 
     } else if (uc1%17 == 0) {
-      TN *r3 = Dup_TN(result);
+      TN *r3 = DUP_TN(result);
       uc1 /= 17;
       Expand_Constant_Multiply(r3,x,uc1,MTYPE_I8,ops);
       shladd(r2,r1,4,r3,ops);
       shladd(r,r2,4,r3,ops);
 
     } else {
-      TN *r3 = Dup_TN(result);
+      TN *r3 = DUP_TN(result);
       Expand_Constant_Multiply(r3,x,uc1,MTYPE_I8,ops);
       shladd(r2,r1,4,Zero_TN,ops);
       shladd(r,r2,4,r3,ops);
@@ -1186,9 +1186,9 @@ Expand_Constant_Multiply (TN *result, TN *var_tn, TARG_INT constant, TYPE_ID mty
     // (latency <= 8, instructions <= 34)
     //
     INT64 uc1,uc2;
-    TN *r1 = Dup_TN(result);
-    TN *r2 = Dup_TN(result);
-    TN *r3 = Dup_TN(result);
+    TN *r1 = DUP_TN(result);
+    TN *r2 = DUP_TN(result);
+    TN *r3 = DUP_TN(result);
     uc1 = uc & 65535;
     uc2 = uc >> 16;
     Expand_Constant_Multiply(r1,x,uc1,MTYPE_I8,ops);
@@ -1204,9 +1204,9 @@ Expand_Constant_Multiply (TN *result, TN *var_tn, TARG_INT constant, TYPE_ID mty
     // (latency <= 8, instructions <= 34)
     //
     INT64 uc1,uc2;
-    TN *r1 = Dup_TN(result);
-    TN *r2 = Dup_TN(result);
-    TN *r3 = Dup_TN(result);
+    TN *r1 = DUP_TN(result);
+    TN *r2 = DUP_TN(result);
+    TN *r3 = DUP_TN(result);
     uc1 = uc & 0xffffffff;
     uc2 = uc >> 32;
     Expand_Constant_Multiply(r1,x,uc1,MTYPE_I8,ops);
