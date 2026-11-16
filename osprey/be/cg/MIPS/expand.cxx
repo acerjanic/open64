@@ -237,29 +237,21 @@ Exp_Immediate (TN *dest, TN *src, OPS *ops)
     Build_OP (TOP_ori, dest, tmp, Gen_Literal_TN(val & 0xffff, 4), ops);
   }
   else {
-    TCON tcon = Host_To_Targ (MTYPE_I8, val);
-    ST *sym = New_Const_Sym (Enter_tcon (tcon), Be_Type_Tbl(MTYPE_I8));
-    Allocate_Object(sym);
-		if(ST_gprel(sym)) {
- 			 //Build_OP(TOP_ld, dest, GP_TN, Gen_Symbol_TN(sym, 0, TN_RELOC_GPREL16), ops);			
-		     Build_OP(TOP_lw, dest, GP_TN, Gen_Symbol_TN(sym, 0, TN_RELOC_GPREL16), ops);
-		     DevWarn("Long Long value is not supported, constant value has been truncated");
-		}
-		else {
-			TN *tmp1= Build_TN_Like(dest);
-			 Build_OP (TOP_lui, tmp1, Gen_Literal_TN((val & 0xffffffff)>> 16, 8), ops);
-			 Build_OP (TOP_ori, tmp1, tmp1, Gen_Literal_TN(val  & 0xffff, 8), ops);
-
-			 
-			
-			 Build_OP (TOP_lui, tmp, Gen_Literal_TN((val >> 48) & 0xffff, 8), ops);
-			 Build_OP (TOP_ori, dest, tmp, Gen_Literal_TN((val >> 32) & 0xffff, 8), ops);
-
-			 Build_OP (TOP_dsll32, dest, dest, Gen_Literal_TN(0, 8), ops);
-			 Build_OP (TOP_daddu, dest, tmp1, dest, ops);
-			 
-			 DevWarn("Long Long value is not supported, constant value has been truncated");		 	 			 
-		}
+    // A full 64-bit value, 16 bits at a time. The constant-pool load
+    // (lw) truncated it, and adding a sign-extended low word to the
+    // shifted high word was 2^32 off whenever bit 31 was set (n32 code
+    // divides long longs by constants through such magic numbers).
+    // One TN per step: later phases expect each to be defined once.
+    TN *t2 = Build_TN_Like(dest);
+    TN *t3 = Build_TN_Like(dest);
+    TN *t4 = Build_TN_Like(dest);
+    TN *t5 = Build_TN_Like(dest);
+    Build_OP (TOP_lui, tmp, Gen_Literal_TN((val >> 48) & 0xffff, 8), ops);
+    Build_OP (TOP_ori, t2, tmp, Gen_Literal_TN((val >> 32) & 0xffff, 8), ops);
+    Build_OP (TOP_dsll, t3, t2, Gen_Literal_TN(16, 4), ops);
+    Build_OP (TOP_ori, t4, t3, Gen_Literal_TN((val >> 16) & 0xffff, 8), ops);
+    Build_OP (TOP_dsll, t5, t4, Gen_Literal_TN(16, 4), ops);
+    Build_OP (TOP_ori, dest, t5, Gen_Literal_TN(val & 0xffff, 8), ops);
   } 
 } 
 
