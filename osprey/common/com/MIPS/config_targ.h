@@ -188,7 +188,11 @@ extern char *Isa_Name (TARGET_ISA target_isa);
 #define IBM_FP_FORMAT	FALSE
 
 /* Do we need to implement quad float? */
-/* #define TARG_NEEDS_QUAD_OPS */
+/* Yes for n32 and n64: long double is SGI's double-double (two doubles),
+ * which the host cannot fold; common/util's quad simulation does. */
+#ifndef TARG_SL
+#define TARG_NEEDS_QUAD_OPS
+#endif
 
 /* Target-specific controls: */
 

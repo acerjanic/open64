@@ -519,7 +519,19 @@ COMMON_UTIL_QUAD_SRCS = \
 else
   ifeq ($(BUILD_TARGET), MIPS)
     ifeq ($(BUILD_OS), LINUX)
-      COMMON_UTIL_QUAD_SRCS =
+      # n32/n64 long double constants are folded by the quad simulation
+      # (TARG_NEEDS_QUAD_OPS), on a Linux host as on IRIX.
+      COMMON_UTIL_QUAD_SRCS = \
+        c_q_add.c             \
+        c_q_div.c             \
+        c_q_mul.c             \
+        c_q_neg.c             \
+        c_q_rel.c             \
+        c_q_sqrt.c            \
+        c_q_sub.c             \
+        c_q_to_a.c            \
+        c_qtenscale.c         \
+        quadsim.c
     else
       COMMON_UTIL_QUAD_SRCS = \
         c_q_add.c             \
@@ -1001,6 +1013,7 @@ derived_files : $(DERIVED_SRCS) $(DERIVED_INCS) be_ver_info.h
 
 ifneq ($(BUILD_TARGET), X8664)
 ifneq ($(BUILD_TARGET), UWASM)
+ifneq ($(BUILD_OS), LINUX)
 # the -OPT: option is not accepted by gcc
 c_q_add.o: c_q_add.c $(COMMON_COM_DIR)/defs.h $(COMMON_UTIL_DIR)/quad.h
 	$(CCF) -OPT:roundoff=0 -c $<
@@ -1016,6 +1029,7 @@ c_q_sqrt.o: c_q_sqrt.c $(COMMON_COM_DIR)/defs.h $(COMMON_UTIL_DIR)/quad.h
 
 c_q_sub.o: c_q_sub.c $(COMMON_COM_DIR)/defs.h $(COMMON_UTIL_DIR)/quad.h
 	$(CCF) -OPT:roundoff=0 -c $<
+endif
 endif
 endif
 ifeq ($(BUILD_COMPILER), OSP)
