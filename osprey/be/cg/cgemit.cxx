@@ -1,3 +1,9 @@
+#ifndef AS_INTERNAL
+#define AS_INTERNAL ".internal"
+#endif
+#ifndef AS_PROTECTED
+#define AS_PROTECTED ".protected"
+#endif
 /*
  *  Copyright (C) 2021 Xcalibyte (Shenzhen) Limited.
  */
@@ -10025,7 +10031,9 @@ EMT_End_File( void )
   }
 
   // Emit uwasm native data
+#if defined(TARG_X8664) || defined(TARG_UWASM)  /* kintsugi */
   CGEMIT_Uwasm_Nat_Data(Asm_File);
+#endif
 
   if (Object_Code) {
     Em_Options_Scn();
