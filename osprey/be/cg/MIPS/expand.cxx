@@ -168,7 +168,9 @@ Expand_Convert_Length ( TN *dest, TN *src, TN *length_tn, TYPE_ID mtype, BOOL si
 	    	Build_OP(signed_extension ? TOP_dsra : TOP_dsrl, dest, tmp, lit_tn, ops);
 	  	}
 	 	else {
-	          if(Pointer_Size==8) {
+	          // n32 has 4-byte pointers but 64-bit registers, as n64 has:
+	          // a 32-bit value is extended to 64 bits either way.
+	          if(Pointer_Size==8 || Target_ABI == ABI_N32) {
 		  	TN *tmp = Build_TN_Of_Mtype(mtype);
 		    	lit_tn = Gen_Literal_TN(32 - val, 4);
 		    	Build_OP(TOP_dsll32, tmp, src, lit_tn, ops);
