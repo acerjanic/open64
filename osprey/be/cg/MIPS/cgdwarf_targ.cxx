@@ -1,3 +1,5 @@
+#define HAVE___UINT64_T 1
+#define HAVE___UINT32_T 1
 #include <stdio.h>
 #include <stdlib.h>
 #include "libelf/libelf.h"
@@ -505,7 +507,7 @@ static FD_REG Machine_Reg_To_FD (TN *tn, UINT32 mc_id, ISA_REGISTER_CLASS c)
   else if (mc_id == 31){
     fd_num = FD_RA;
   }
-  else if ((TN_save_rclass(tn) == ISA_REGISTER_CLASS_control) &&
+  else if (FALSE /* kintsugi: SL only */ &&
 	   (TN_save_reg(tn) == 4)) {
     fd_num = FD_RA;
   }
