@@ -60,16 +60,17 @@ SECTION Sections[_SEC_INDEX_MAX] = {
      0|SHF_WRITE|SHF_ALLOC, 
 	SHT_PROGBITS, 0, 
      INT64_MAX, ELF_DATA, 0},
+  {_SEC_SDATA,	NULL,
+     0|SHF_WRITE|SHF_MIPS_GPREL|SHF_ALLOC,
+	SHT_PROGBITS, 0, 
+     INT32_MAX, MIPS_SDATA, 0},
+/* kintsugi: in the enum's order */
 #ifdef KEY
   {  _SEC_LDATA_MIPS_LOCAL,  NULL,
      0,
         0, 0,
      0, ".unknown", 0}, //bug, chm.. what does this section means? It seems useless.
   #endif
-  {_SEC_SDATA,	NULL,
-     0|SHF_WRITE|SHF_MIPS_GPREL|SHF_ALLOC,
-	SHT_PROGBITS, 0, 
-     INT32_MAX, MIPS_SDATA, 0},
   {_SEC_LDATA,	NULL,
      0|SHF_WRITE|SHF_ALLOC|SHF_MIPS_LOCAL,
 	SHT_PROGBITS, 0, 
