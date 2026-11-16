@@ -142,6 +142,9 @@ typedef enum {
 #define Is_Target_Sl2_mcore() (Target == TARGET_sl2_mcore)
 #endif
 #define Is_Target_64bit() (Target_ABI == ABI_N64)
+#ifdef __cplusplus
+extern BOOL Is_Target_32bit (void);  /* kintsugi: defined in wn_mp.cxx */
+#endif
 #define Is_Target_Opteron() (0)
 
 extern TARGET_PROCESSOR Target;		/* -Tc */
