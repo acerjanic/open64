@@ -364,10 +364,14 @@ Targ_Emit_Const (FILE *fl,	    /* File to which to write */
 	}
 
       case MTYPE_FQ: {
-        char *p = (char *) & TCON_R16(tc);
-	emit_bytes( fl, p, sizeof(TCON_R16(tc)) );
-	DevWarn("Fix me quad dump");
-	//	fprintf(fl, "\t%s quad %#g\n", ASM_CMNT, TCON_R16(tc) );
+	/* SGI's double-double (TARG_NEEDS_QUAD_OPS): the high double,
+	   then the low one, each in the target's order as an F8 is.
+	   The raw bytes were the host's (little-endian on x86). */
+	double *pv = (double *) & TCON_R16(tc);
+	for (INT half = 0; half < 2; half++) {
+	  TCON d = Host_To_Targ_Float(MTYPE_F8, pv[half]);
+	  Targ_Emit_Const(fl, d, FALSE, 1, loc + 8 * half);
+	}
 	--rc;
 	break;
 	}
