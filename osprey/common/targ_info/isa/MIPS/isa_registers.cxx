@@ -200,8 +200,10 @@ main (int argc, char** argv)
   // bc2t 
   ISA_REGISTER_CLASS rc_copc = ISA_Register_Class_Create("copc", 1, false, false);
 #endif
+#ifdef TARG_SL  /* kintsugi: no register set outside SL */
   //SL control register
   ISA_REGISTER_CLASS rc_control = ISA_Register_Class_Create("control", 32, true, false);
+#endif
 
 #ifdef TARG_SL
   // SL special registers
