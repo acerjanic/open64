@@ -1784,7 +1784,9 @@ VARIANT Memop_Variant(WN *memop)
        */
       offset = WN_load_offset(memop);
       ty_align = ST_alignment(WN_st(memop));
-#if defined(TARG_X8664) || defined(TARG_SL) // bug 8198: in absence of pointed-to type's alignment, need this
+      // MIPS too: our WHIRL stores a wide zero into an array's tail at
+      // any offset (fec's form, with the TY_IDX's alignment set to 1).
+#if defined(TARG_X8664) || defined(TARG_SL) || defined(TARG_MIPS) // bug 8198: in absence of pointed-to type's alignment, need this
       if (offset) {
 	INT offset_align = offset % required_alignment;
 	if (offset_align) ty_align = MIN(ty_align, offset_align);
