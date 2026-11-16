@@ -50,6 +50,10 @@
 #include "defs.h"
 #include "quad.h"
 
+/* The high word of a double (sign, exponent, top of the fraction), on a
+   host of either byte order. */
+#define QUAD_DHI(d)	((INT32) (*(UINT64 *) &(d) >> 32))
+
 /* note that this routine must be kept in sync with the corresponding libc
  * routine, q_add.
  */
@@ -58,18 +62,23 @@ typedef union
 {
 	struct
 	{
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+		UINT32 lo;	/* little-endian host: low word first */
+		UINT32 hi;
+#else
 		UINT32 hi;
 		UINT32 lo;
+#endif
 	} word;
 
 	double	d;
 } du;
 
 static const du		twop914 =
-{0x79100000,	0x00000000};
+{ .word = { .hi = 0x79100000, .lo = 0x00000000 } };
 
 static const du		inf =
-{0x7ff00000,	0x00000000};
+{ .word = { .hi = 0x7ff00000, .lo = 0x00000000 } };
 
 extern	QUAD	c_q_add(QUAD, QUAD, INT *);
 
@@ -105,11 +114,11 @@ double	tmp1, tmp2, lo, rem;
 	xhi = x.hi; xlo = x.lo;
 	yhi = y.hi; ylo = y.lo;
 
-	iyhi = *(INT32 *)&yhi;
+	iyhi = QUAD_DHI(yhi);
 	xptyhi = (iyhi >> 20);
 	xptyhi &= 0x7ff;
 
-	ixhi = *(INT32 *)&xhi;
+	ixhi = QUAD_DHI(xhi);
 	xptxhi = (ixhi >> 20);
 	xptxhi &= 0x7ff;
 

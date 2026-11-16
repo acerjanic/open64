@@ -58,8 +58,13 @@ typedef union
 {
 	struct
 	{
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+		UINT32 lo;	/* little-endian host: low word first */
+		UINT32 hi;
+#else
 		UINT32 hi;
 		UINT32 lo;
+#endif
 	} word;
 
 	double	d;
@@ -69,19 +74,19 @@ typedef union
 /* const1 is 1.0 + 2^(53 - 53/2), i.e. 1.0 + 2^27 */
 
 static	const du	const1 =
-{0x41a00000,	0x02000000};
+{ .word = { .hi = 0x41a00000, .lo = 0x02000000 } };
 
 static const du		twopm968 =
-{0x03700000,	0x00000000};
+{ .word = { .hi = 0x03700000, .lo = 0x00000000 } };
 
 static const du		twopm54 =
-{0x3c900000,	0x00000000};
+{ .word = { .hi = 0x3c900000, .lo = 0x00000000 } };
 
 static const du		twop52 =
-{0x43300000,	0x00000000};
+{ .word = { .hi = 0x43300000, .lo = 0x00000000 } };
 
 static const du		inf =
-{0x7ff00000,	0x00000000};
+{ .word = { .hi = 0x7ff00000, .lo = 0x00000000 } };
 
 extern	QUAD	c_q_div(QUAD, QUAD, INT *);
 

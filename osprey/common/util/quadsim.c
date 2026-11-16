@@ -78,42 +78,47 @@ typedef union
 {
 	struct
 	{
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+		UINT32 lo;	/* little-endian host: low word first */
+		UINT32 hi;
+#else
 		UINT32 hi;
 		UINT32 lo;
+#endif
 	} word;
 
 	double	d;
 } du;
 
 static const du		m_twop31 =
-{0xc1e00000,	0x00000000};
+{ .word = { .hi = 0xc1e00000, .lo = 0x00000000 } };
 
 static const du		twop31m1 =
-{0x41dfffff,	0xffc00000};
+{ .word = { .hi = 0x41dfffff, .lo = 0xffc00000 } };
 
 static const du		twop32m1 =
-{0x41efffff,	0xffe00000};
+{ .word = { .hi = 0x41efffff, .lo = 0xffe00000 } };
 
 static const du		twop52 =
-{0x43300000,	0x00000000};
+{ .word = { .hi = 0x43300000, .lo = 0x00000000 } };
 
 static const	du	twop62 =
-{0x43d00000,	0x00000000};
+{ .word = { .hi = 0x43d00000, .lo = 0x00000000 } };
 
 static const	du	m_twop63 =
-{0xc3e00000,	0x00000000};
+{ .word = { .hi = 0xc3e00000, .lo = 0x00000000 } };
 
 static const	du	twop63 =
-{0x43e00000,	0x00000000};
+{ .word = { .hi = 0x43e00000, .lo = 0x00000000 } };
 
 static const	du	twop64 =
-{0x43f00000,	0x00000000};
+{ .word = { .hi = 0x43f00000, .lo = 0x00000000 } };
 
 static const	du	twopm916 =
-{0x06b00000,	0x00000000};
+{ .word = { .hi = 0x06b00000, .lo = 0x00000000 } };
 
 static const	du	infinity =
-{0x7ff00000,	0x00000000};
+{ .word = { .hi = 0x7ff00000, .lo = 0x00000000 } };
 
 #define STRINGIFY(str) #str
 #ifndef TARG_LOONGSON
