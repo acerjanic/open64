@@ -1745,7 +1745,7 @@ extern void Generate_Return_Address(void);
 #endif
   IGLS_Schedule_Region (FALSE /* after register allocation */);
   // use cflow to handle branch fusing cmp/jcc for Orochi and greater.
-  if (Is_Target_Orochi() && CG_branch_fuse ) {
+  if (FALSE) {  /* kintsugi: x86 only */
     CFLOW_Optimize(CFLOW_BR_FUSE, "CFLOW (fifth pass)");
   }
 #endif
