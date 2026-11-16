@@ -11812,6 +11812,22 @@ static WN *lower_call(WN *block, WN *tree, LOWER_ACTIONS actions)
     }
     else
     {
+      // A struct smaller than a register that wopt has typed as a
+      // scalar (a one-field struct, at -O2) still travels as a struct:
+      // left-justified in the register on a big-endian target, as
+      // lower_mload_actual and the formal side have it (n32's rule).
+      if (Target_Byte_Sex == BIG_ENDIAN && WN_operator_is(parm, OPR_PARM) &&
+	  TY_kind(WN_ty(parm)) == KIND_STRUCT &&
+	  MTYPE_is_integral(parmType) &&
+	  Preg_Offset_Is_Int(PLOC_reg(ploc)) &&
+	  MTYPE_byte_size(parmType) < MTYPE_byte_size(Max_Uint_Mtype)) {
+	INT shift = 8 * (MTYPE_byte_size(Max_Uint_Mtype) -
+			 MTYPE_byte_size(parmType));
+	actual = WN_Shl(Max_Uint_Mtype,
+			WN_Cvt(parmType, Max_Uint_Mtype, actual),
+			WN_Intconst(MTYPE_I4, shift));
+	parmType = Max_Uint_Mtype;
+      }
       actual = lower_actual(callblock, actual, parmType, PLOC_reg(ploc));
 
       if (WN_operator_is(parm, OPR_PARM))
