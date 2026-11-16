@@ -259,8 +259,15 @@ Expand_Extract_Bits (TYPE_ID rtype, TYPE_ID desc, UINT bit_offset, UINT bit_size
     return;
   }
   ISA_REGISTER_CLASS rclass = ISA_REGISTER_CLASS_integer;
+#if defined(TARG_SL)
   INT reg_size = 
 	  ISA_REGISTER_CLASS_INFO_Bit_Size(ISA_REGISTER_CLASS_Info(rclass));
+#else
+  // The shifts below are the 64-bit ones (dsll, dsra), and n32 and n64
+  // registers are 64 bits wide; the ISA description says 32 (from SL),
+  // which made a 4-byte field of an 8-byte store shift by 0 and lose it.
+  INT reg_size = 64;
+#endif
 #if defined(TARG_SL)
   TOP left_shift_op = TOP_sll;
 #else
