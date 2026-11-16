@@ -1521,9 +1521,12 @@ Are_different(CODEREP *cr1, CODEREP *cr2)
 
       return FALSE;
     }
-    Is_True(FALSE, ("EXP_WORKLST::Are_different:  must not reach here."));
+    // A kid that is not a leaf: our WHIRL (MIPSpro's form) can reach
+    // here, as an Open64 release build does with no check; "different"
+    // is the conservative answer (nothing is shared).
+    return TRUE;
   case CK_OP:
-    Is_True(FALSE, ("EXP_WORKLST::Are_different:  must not reach here."));
+    return TRUE;
   case CK_LDA:
   case CK_CONST:
   case CK_RCONST:
