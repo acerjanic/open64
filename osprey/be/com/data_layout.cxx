@@ -113,7 +113,7 @@ extern void Early_Terminate (INT status);
 
 #if defined(TARG_MIPS) && !defined(TARG_SL)
 //static BOOL inline Is_Target_64bit (void) { return TRUE; }
-static BOOL inline Is_Target_32bit (void) { return FALSE; }
+/* kintsugi: Is_Target_32bit in config_targ.h */
 #endif // TARG_MIPS
 
 #define ST_force_gprel(s)	ST_gprel(s)
