@@ -263,6 +263,7 @@ void Instruction_Print_Group(ISA_PRINT_TYPE print_type, TOP top, ... )
 		    current_print_desc->type->name);
     // exit(EXIT_FAILURE);
   }
+  if (top == TOP_UNDEFINED) return;   /* kintsugi: empty group */
   op_pr *op_print = new op_pr;
   op_prints_list.push_back(op_print);
   op_print->desc = current_print_desc;
