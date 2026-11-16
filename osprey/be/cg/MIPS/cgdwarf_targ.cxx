@@ -927,7 +927,10 @@ Build_Fde_For_Proc (Dwarf_P_Debug dw_dbg, BB *firstbb, LABEL_IDX begin_label, LA
       if (OP_opnds(op) > 0) {
 	TN *src_tn = OP_opnd(op,0);
 	if (TN_is_register(src_tn) && TN_is_save_reg(src_tn)) {
-          fd_reg = TN_to_fd (src_tn);
+	  // The copy of RA (ra_sv) may sit in any register, which has no
+	  // frame-description slot of its own: it describes RA.
+	  fd_reg = (ra_sv != NULL && src_tn == ra_sv) ? FD_RA
+						      : TN_to_fd (src_tn);
 	  if (OP_store(op)) {
 	  	prev_fd_to_spill_loc[fd_reg] = curr_fd_to_spill_loc[fd_reg];
 		curr_fd_to_spill_loc[fd_reg] = TN_spill(OP_opnd(op,2));
