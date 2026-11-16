@@ -552,9 +552,17 @@ public:
       return;
     } else if (strncmp(arg, "-TARG:abi=", 10) == 0) {
       if (strcmp(arg + 10, "n32") == 0) {
+#ifdef TARG_MIPS
         Target_ABI = ABI_N32;
+#else
+        Target_ABI = ABI_n32;
+#endif
       } else if (strcmp(arg + 10, "n64") == 0) {
+#ifdef TARG_MIPS
         Target_ABI = ABI_N64;
+#else
+        Target_ABI = ABI_n64;
+#endif
       }
     }
     if (strcmp(arg, "-sw") == 0) {  // MASTIFF-OPT: "-show" --> "-sw"
