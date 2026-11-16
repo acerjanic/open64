@@ -552,9 +552,9 @@ public:
       return;
     } else if (strncmp(arg, "-TARG:abi=", 10) == 0) {
       if (strcmp(arg + 10, "n32") == 0) {
-        Target_ABI = ABI_n32;
+        Target_ABI = ABI_N32;
       } else if (strcmp(arg + 10, "n64") == 0) {
-        Target_ABI = ABI_n64;
+        Target_ABI = ABI_N64;
       }
     }
     if (strcmp(arg, "-sw") == 0) {  // MASTIFF-OPT: "-show" --> "-sw"
