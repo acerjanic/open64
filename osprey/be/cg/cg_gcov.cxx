@@ -70,7 +70,7 @@
 
 #if defined(TARG_MIPS) && !defined(TARG_SL)
 //static BOOL inline Is_Target_64bit (void) { return TRUE; }
-static BOOL inline Is_Target_32bit (void) { return FALSE; }
+/* kintsugi: Is_Target_32bit in config_targ.h */
 #endif // TARG_MIPS
 
 MEM_POOL name_pool, *name_pool_ptr = NULL;
