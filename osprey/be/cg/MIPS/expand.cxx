@@ -2792,6 +2792,17 @@ Exp_Intrinsic_Call (INTRINSIC id, TN *op0, TN *op1, TN *op2, OPS *ops,
       return NULL;
     }
     return NULL;	
+  case INTRN_SYNCHRONIZE:
+    Build_OP(TOP_sync, ops);
+    return NULL;
+  case INTRN_LOCK_RELEASE_I4:
+  case INTRN_LOCK_RELEASE_I8:
+    // __lock_release: a barrier, then zero into the lock (MIPSpro's
+    // sync builtins, which our C++ headers' locks use)
+    Build_OP(TOP_sync, ops);
+    Build_OP(id == INTRN_LOCK_RELEASE_I4 ? TOP_sw : TOP_sd,
+	     Zero_TN, op0, Gen_Literal_TN(0, 4), ops);
+    return NULL;
   default:
     FmtAssert(FALSE, ("Exp_Intrinsic_Call NYI"));
     return NULL; // if you can
