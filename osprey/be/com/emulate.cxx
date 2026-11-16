@@ -59,6 +59,7 @@
 #endif /* USE_PCH */
 #pragma hdrstop
 #include <math.h>
+#include <string.h>
 #if defined(BUILD_OS_DARWIN)
 #include <limits.h>
 #else /* defined(BUILD_OS_DARWIN) */
@@ -2859,6 +2860,14 @@ static WN *em_alog10(WN *block, WN *x)
      t_log10.vals.qval.qval[2] =  0xb1526e50;
      t_log10.vals.qval.qval[3] =  0x3ffdbcb7;
      mpy = WN_Mpy(type, Make_Const(t_log10), log);
+#elif defined(TARG_MIPS)
+     // SGI's double-double: the nearest double and the remainder.
+     double hl[2];
+     QUAD_TYPE qt;
+     hl[0] = M_LOG10;
+     hl[1] = (double) (M_LOG10Q - (long double) hl[0]);
+     memcpy(&qt, hl, sizeof(qt));
+     mpy =  WN_Mpy(type, Make_Const(Host_To_Targ_Quad(qt)), log);
 #else
      mpy =  WN_Mpy(type, 
 		   Make_Const(Host_To_Targ_Quad(M_LOG10Q)),

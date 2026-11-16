@@ -114,7 +114,13 @@ extern "C" {
 struct ty;
 
 /* Define a quad-precision floating point type appropriate to host: */
-#ifdef HOST_SUPPORTS_QUAD_FLOAT
+/* MIPS (n32, n64) folds long double through the quad simulation
+ * (TARG_NEEDS_QUAD_OPS), which keeps SGI's double-double in the 16
+ * bytes: a host long double (x87, 10 significant bytes) would lose the
+ * low double's top six bytes whenever it is passed by value. */
+#if defined(TARG_MIPS) && !defined(TARG_SL)
+typedef struct { INT32 qval[4]; } QUAD_TYPE;
+#elif defined(HOST_SUPPORTS_QUAD_FLOAT)
 #ifdef TARG_LOONGSON
 struct QUAD_TYPE
 {
