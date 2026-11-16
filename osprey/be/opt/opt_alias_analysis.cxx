@@ -2515,7 +2515,13 @@ OPT_STAB::Generate_call_mu_chi_by_ref(WN *wn, ST *call_st,
 #endif
 
   alias_set = Rule()->Alias_Set_Call_By_Ref(this);
-  bool extern_call = call_st && ST_sclass(call_st) == SCLASS_EXTERN;
+  // An external function can call back into this file through a
+  // pointer (a destructor passed to the C++ runtime's __vec_delete, a
+  // virtual function, a qsort comparator) and change a file-static
+  // variable there; the shortcut below assumed it cannot. Our WHIRL
+  // (MIPSpro's form) does not mark which functions' addresses escape,
+  // so it is off: every global stays in an external call's chi list.
+  bool extern_call = FALSE;
   for (idx = BS_Choose( alias_set );
        idx != (AUX_ID) BS_CHOOSE_FAILURE;
        idx = BS_Choose_Next ( alias_set, idx ))  {
@@ -2777,7 +2783,13 @@ OPT_STAB::Generate_call_mu_chi_by_value(WN *wn, ST *call_st,
   }
 
   alias_set = Rule()->Alias_Set_Call_By_Value(this);
-  bool extern_call = call_st && ST_sclass(call_st) == SCLASS_EXTERN;
+  // An external function can call back into this file through a
+  // pointer (a destructor passed to the C++ runtime's __vec_delete, a
+  // virtual function, a qsort comparator) and change a file-static
+  // variable there; the shortcut below assumed it cannot. Our WHIRL
+  // (MIPSpro's form) does not mark which functions' addresses escape,
+  // so it is off: every global stays in an external call's chi list.
+  bool extern_call = FALSE;
   for (idx = BS_Choose( alias_set );
        idx != (AUX_ID) BS_CHOOSE_FAILURE;
        idx = BS_Choose_Next ( alias_set, idx )) {
