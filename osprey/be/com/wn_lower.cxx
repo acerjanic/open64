@@ -10950,11 +10950,16 @@ static WN *lower_intrinsic_op(WN *block, WN *tree, LOWER_ACTIONS actions)
 {
   WN		*wn;
   OPCODE	op = WN_opcode(tree);
-  INTRINSIC	id = WN_intrinsic(tree);
+  // lower_emulation also sends quad (long double) arithmetic, compares
+  // and conversions here, which intrinsic_runtime calls by their
+  // emulation routine's name; those have no intrinsic id.
+  BOOL is_quad = ! OPCODE_is_intrinsic(op) &&
+    (MTYPE_is_quad(WN_rtype(tree)) || MTYPE_is_quad(WN_desc(tree)));
+  INTRINSIC	id = is_quad ? INTRINSIC_INVALID : WN_intrinsic(tree);
 
   Is_True(Action(LOWER_INTRINSIC),
 	  ("actions does not contain LOWER_INTRINSIC"));
-  Is_True(OPCODE_is_intrinsic(op),
+  Is_True(OPCODE_is_intrinsic(op) || is_quad,
 	  ("expression is not intrinsic"));
 
 #if !defined(IRIX)
@@ -11180,11 +11185,17 @@ static WN *lower_intrinsic_op(WN *block, WN *tree, LOWER_ACTIONS actions)
 static WN *lower_intrinsic(WN *block, WN *tree, LOWER_ACTIONS actions)
 {
 
+  // Quad (long double) operations come here from lower_intrinsic_op
+  // with no intrinsic id: intrinsic_runtime names their routine.
+  BOOL is_quad = ! OPCODE_is_intrinsic(WN_opcode(tree)) &&
+    (MTYPE_is_quad(WN_rtype(tree)) || MTYPE_is_quad(WN_desc(tree)));
+
   Is_True(Action(LOWER_INTRINSIC),
 	  ("actions does not contain LOWER_INTRINSIC"));
-  Is_True(OPCODE_is_intrinsic(WN_opcode(tree)),
+  Is_True(OPCODE_is_intrinsic(WN_opcode(tree)) || is_quad,
 	  ("expression is not intrinsic"));
 
+  if (! is_quad)
   {
     INTRINSIC	id = (INTRINSIC) WN_intrinsic(tree);
 
