@@ -185,8 +185,16 @@ main (int argc, char** argv)
 {
   ISA_Registers_Begin("MIPS");
 
+#ifdef TARG_SL
   ISA_REGISTER_CLASS rc_integer = ISA_Register_Class_Create("integer", 32, true, false);
   ISA_REGISTER_CLASS rc_float = ISA_Register_Class_Create("float", 32, true, false);
+#else
+  // MIPS III and later (n32, n64): 64-bit integer and float registers.
+  // At 32, dedicated float TNs defaulted to 4 bytes and copies of a
+  // double return value became mov.s.
+  ISA_REGISTER_CLASS rc_integer = ISA_Register_Class_Create("integer", 64, true, false);
+  ISA_REGISTER_CLASS rc_float = ISA_Register_Class_Create("float", 64, true, false);
+#endif
 
   ISA_REGISTER_CLASS rc_fcc = ISA_Register_Class_Create("fcc", 1, false, false);
 
