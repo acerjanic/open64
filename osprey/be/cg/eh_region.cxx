@@ -420,10 +420,19 @@ static EH_RANGE_LIST range_list;
 void ADD_EH_RANGE (RID * rid)
 {
     if (RID_TYPE_eh(rid)) {
+#if defined(TARG_MIPS) && !defined(TARG_SL)
+	// IRIX: MIPSpro's front ends put a try region's GOTOs to its
+	// handlers, and a cleanup region's destructor call, in the
+	// region's pragma block.  That block is data-flow information
+	// only (code generation never lowers it), so the region still
+	// gets a range, as in the original SGI code.
+	range_list.add_range(rid);
+#else
     	if (WN_block_empty(WN_region_pragmas(RID_rwn(rid))))
       	    range_list.add_range(rid);
 	else
 	    Set_ST_is_not_used (INITO_st(WN_ereg_supp(RID_rwn(rid))));
+#endif
     }
 }
 #else
@@ -445,6 +454,10 @@ struct SET_PARENT {
     RID_PARENT_ITER first(r.rid);
     RID_PARENT_ITER last(NULL);
     first = std::find_if(++first, last, IS_EH_RID());
+    // An EH ancestor that got no range (see ADD_EH_RANGE) is skipped:
+    // the parent is the nearest one that has a range, or none.
+    while (first != last && RID_eh_range_ptr(*first) == NULL)
+      first = std::find_if(++first, last, IS_EH_RID());
     if (first == last)
       r.parent = NULL;
     else
@@ -567,6 +580,13 @@ EH_Set_Start_Label(EH_RANGE* p)
       if (p->parent != NULL) {
 	label = Duplicate_LABEL(p->parent->start_label);
      	Set_Label_BB(label, NULL);
+      }
+      else {
+	// A guard with neither an elder sibling nor an enclosing range
+	// to share a label with starts where it is, with a label of
+	// its own (the label was left unset here before).
+	label = Gen_Temp_Label();
+	Set_LABEL_begin_eh_range(label);
       }
     }
 
