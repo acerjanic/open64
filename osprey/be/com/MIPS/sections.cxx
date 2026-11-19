@@ -135,7 +135,19 @@ SECTION Sections[_SEC_INDEX_MAX] = {
 	SHT_PROGBITS, 0, 
      INT64_MAX, MIPS_EH_REGION_SUPP, 0},
 #else
-#ifdef KEY
+#if !defined(TARG_SL)
+  // IRIX: the names MIPSpro gives its EH tables and IRIX's C++ runtime
+  // looks up (through the linker's __elf_vaddr_ symbols, which
+  // SHF_MIPS_NAMES asks for).
+  {_SEC_EH_REGION,      NULL,
+     0|SHF_WRITE|SHF_ALLOC|SHF_MIPS_NAMES,
+        SHT_PROGBITS, 0,
+     INT64_MAX, "_MIPS_eh_region", 0},
+  {_SEC_EH_REGION_SUPP, NULL,
+     0|SHF_WRITE|SHF_ALLOC|SHF_MIPS_NAMES,
+        SHT_PROGBITS, 0,
+     INT64_MAX, "_MIPS_eh_region_supp", 0},
+#elif defined(KEY)
   {_SEC_EH_REGION,      NULL,
      0|SHF_WRITE|SHF_ALLOC|SHF_MIPS_NAMES,
         SHT_PROGBITS, 0,
