@@ -914,7 +914,7 @@ ST_For_Range_Table(WN * wn)
 		      2 * offset_size;
   UINT32 size = header_size + number_of_ranges * range_size;
 
-#ifdef KEY
+#if defined(KEY) && !(defined(TARG_MIPS) && !defined(TARG_SL))
 // This is a temporary solution. The above 'size' is not properly
 // calculated. TODO: Fix the size above.
   size = 0;	// don't output the size
@@ -2039,12 +2039,23 @@ Create_INITO_For_Range_Table(ST * st, ST * pu)
   type_filter_map.clear();
 }
 
-#else
+#endif // KEY
+#if !defined(KEY) || (defined(TARG_MIPS) && !defined(TARG_SL))
 /* The first implementation, not conform to the C++ ABI.
    NO call site table, type table, action table, .etc. 
+   It is the table MIPSpro writes and IRIX's C++ runtime reads (the
+   section _MIPS_eh_region): a header, then one entry per range with
+   the region's supplement (written as the front end gave it), the
+   parent as a relative index, the kind (try 0, exception
+   specification 1, cleanup 2) and the start and end offsets from the
+   PU.  IRIX builds use it in place of the GNU LSDA above.
  */
 static void
+#ifdef KEY
+Create_IRIX_INITO_For_Range_Table(ST * st, ST * pu)
+#else
 Create_INITO_For_Range_Table(ST * st, ST * pu)
+#endif
 {
   INITO_IDX inito = New_INITO(st);
   INITV_IDX inv_blk = New_INITV ();
@@ -2096,7 +2107,7 @@ Create_INITO_For_Range_Table(ST * st, ST * pu)
     prev_inv = Append_INITV(inv, INITO_IDX_ZERO, prev_inv);
   }
 }
-#endif // KEY
+#endif // !KEY || IRIX
 #endif // TARG_IA64 
 
 
@@ -2249,6 +2260,14 @@ EH_Write_Range_Table(WN * wn)
 #endif // KEY
 
   fix_mask_ranges();
+#if defined(TARG_MIPS) && !defined(TARG_SL)
+  // IRIX's runtime takes nested ranges, children first, as MIPSpro
+  // writes them: no flattening.
+  reorder_range_list();
+  ST * st = ST_For_Range_Table(wn);
+  eh_pu_range_st = st;
+  Create_IRIX_INITO_For_Range_Table(st, WN_st(wn));
+#else
 #ifdef KEY
   flatten_regions();
 #endif
@@ -2257,6 +2276,7 @@ EH_Write_Range_Table(WN * wn)
   ST * st = ST_For_Range_Table(wn);
   eh_pu_range_st = st;
   Create_INITO_For_Range_Table(st, WN_st(wn));  
+#endif
 }
 
 void print_label(LABEL_IDX label)
