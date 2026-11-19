@@ -675,6 +675,26 @@ static INT *local_state, *entry_state, *exit_state;
  *	  2. A global propagation step to determine the state at the 
  *	     start and end of each basic block.
  */
+#ifdef IRIX_FRAME
+/* IRIX: the spill location when OP stores the return address $31 to
+ * its frame as a plain spill (the register allocator's, at -O2), not
+ * through a save TN or the copy ra_sv; else NULL.  The unwinder needs
+ * the return address's rule for these as well. */
+static ST *
+Irix_RA_Spill (OP *op)
+{
+  if (!OP_store(op) || OP_opnds(op) < 3) return NULL;
+  TN *src = OP_opnd(op, 0);
+  if (!TN_is_register(src) || TN_is_save_reg(src)) return NULL;
+  if (TN_register_class(src) != ISA_REGISTER_CLASS_integer ||
+      REGISTER_machine_id(TN_register_class(src), TN_register(src)) != 31)
+    return NULL;
+  TN *adr = OP_opnd(op, 2);
+  if (!TN_is_symbol(adr) || TN_spill(adr) == NULL) return NULL;
+  return TN_spill(adr);
+}
+#endif
+
 static void Compute_Reg_State (BB *firstbb)
 {
   BB *bb;
@@ -700,7 +720,13 @@ static void Compute_Reg_State (BB *firstbb)
       if (OP_store(op) && TN_is_save_reg(OP_opnd(op,0))) {
         LOCAL_STATE(bb) |= 1 << Save_TN_to_fd(OP_opnd(op,0));
       }
-
+#ifdef IRIX_FRAME
+      if (ST *ra_spill = Irix_RA_Spill(op)) {
+        LOCAL_STATE(bb) |= 1 << FD_RA;
+        if (fd_to_spill_loc[FD_RA] == NULL)
+          fd_to_spill_loc[FD_RA] = ra_spill;
+      }
+#endif
 #if !defined(TARG_SL)
       // look for spill of static link
       if (PU_is_nested_func(Get_Current_PU()) && BB_entry(bb) && OP_store(op)) {
@@ -732,6 +758,15 @@ static void Compute_Reg_State (BB *firstbb)
 	}
 	ENTRY_STATE(bb) = new_entry_state;
       } 
+#ifdef IRIX_FRAME
+      /*
+       * A handler has no predecessors: IRIX's runtime enters it with
+       * the frame as the prologue left it, so every register the
+       * prologue saved (the return address included) is still saved.
+       */
+      if (BB_handler(bb) && BB_preds(bb) == NULL)
+        ENTRY_STATE(bb) = EXIT_STATE(firstbb);
+#endif
       /*
        * If handler of FP-based routine, add FP to entry state,
        * since runtime will restore the SP and FP value.
@@ -1074,6 +1109,17 @@ Build_Fde_For_Proc (Dwarf_P_Debug dw_dbg, BB *firstbb, LABEL_IDX begin_label, LA
 	}
       }
 
+#ifdef IRIX_FRAME
+      if (ST *ra_spill = Irix_RA_Spill(op)) {
+        if (ra_sv == NULL || OP_opnd(op, 0) != ra_sv) {
+          prev_fd_to_spill_loc[FD_RA] = curr_fd_to_spill_loc[FD_RA];
+          curr_fd_to_spill_loc[FD_RA] = ra_spill;
+          fd_to_spill_loc[FD_RA] = ra_spill;
+          if (current_state[FD_RA] != DS_In_Memory)
+            fde = update_state (fde, FD_RA, current_state, DS_In_Memory);
+        }
+      }
+#endif
       // look for spills of callee-save registers that are not marked as 
       // save tns.  LRA can insert this spills because it sees that a 
       // register is not used in the bb so it does a spill 
