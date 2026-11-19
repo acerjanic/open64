@@ -89,7 +89,15 @@ MIPS IV ISA and the R10000, big-endian; `-TENV:PIC -G8` give the
 position-independent code IRIX's shared libraries need, as MIPSpro's
 driver passes them. The phases follow MIPSpro's driver: `-PHASE:c` at
 `-O0` and `-O1` (and with `-g`), `-PHASE:w:c` at `-O2`, `-PHASE:l:w:c`
-at `-O3`. `-LANG:=ansi_c` for C, `-LANG:=cplus` for C++ (built with
-exceptions off: this back end writes no exception tables MIPSpro's
-runtime reads). The assembly is GNU syntax; Iridium's
-`tools/edg-whirl/open64/fix-asm` turns it into IRIX `as` input.
+at `-O3`. `-LANG:=ansi_c` for C, `-LANG:=cplus` for C++. The assembly
+is GNU syntax; Iridium's `tools/edg-whirl/open64/fix-asm` turns it into
+IRIX `as` input.
+
+C++ exceptions (Iridium's step 9a): for the MIPS target this branch
+writes MIPSpro's exception tables (`_MIPS_eh_region`,
+`_MIPS_eh_region_supp`) and MIPSpro's frame descriptions (a `"z"`
+`.debug_frame` whose FDEs carry the offset of their function's range
+table), which IRIX's C++ runtime reads. IRIX's `as` must then run with
+`-g0` (the assembly has its own `.debug_frame`), and Iridium's
+`tools/edg-whirl/open64/ehreloc` turns the table references into the
+section displacements (`R_MIPS_SCN_DISP`) IRIX's `as` cannot write.
