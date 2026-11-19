@@ -126,8 +126,38 @@ static BOOL has_create = FALSE;
 #define   FD_FIRST FD_R0
 #define   FD_LAST  32
 
+#ifdef IRIX_FRAME
+/* IRIX: a slot is the integer register's own number ($16-$23, $30 and
+ * the return address $31), except $gp, kept in the spare slot 24 (28
+ * is the CFA's), and the callee-saved floating-point registers $f20 to
+ * $f31, in slots 0 to 11.  (The SL-style layout above, with RA in
+ * slot 0, put $31 and $16 in one slot and every register one DWARF
+ * number off.) */
+#undef  FD_RA
+#define FD_RA      FD_R31
+#define FD_IRIX_GP 24
+#endif
+
 typedef UINT32 FD_REG;
 
+#ifdef IRIX_FRAME
+static const UINT32 fd_to_track[FD_LAST] = {
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,	/* $f20-$f31 */
+  1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1,	/* $16-$23, gp, $30, $31 */
+};
+
+static const UINT32 fd_to_dwarf[FD_LAST] = {
+  DW_FRAME_FREG20, DW_FRAME_FREG20 + 1, DW_FRAME_FREG20 + 2,
+  DW_FRAME_FREG20 + 3, DW_FRAME_FREG20 + 4, DW_FRAME_FREG20 + 5,
+  DW_FRAME_FREG20 + 6, DW_FRAME_FREG20 + 7, DW_FRAME_FREG20 + 8,
+  DW_FRAME_FREG20 + 9, DW_FRAME_FREG20 + 10, DW_FRAME_FREG20 + 11,
+  12, 13, 14, 15,
+  DW_FRAME_REG16, DW_FRAME_REG17, DW_FRAME_REG18, DW_FRAME_REG19,
+  DW_FRAME_REG20, DW_FRAME_REG21, DW_FRAME_REG22, DW_FRAME_REG23,
+  DW_FRAME_REG28 /* gp, slot 24 */, 25, 26, 27,
+  0 /* cfa */, DW_FRAME_REG29, DW_FRAME_REG30, DW_FRAME_REG31,
+};
+#else
 static const UINT32 fd_to_track[FD_LAST] = {
   // BAD inherently HARD CODED callee save register numbering assumed here
   // a map to indicate which register whose state we need to keep track of
@@ -148,6 +178,7 @@ static const UINT32 fd_to_dwarf[FD_LAST] = {
   0, DW_FRAME_REG29, DW_FRAME_REG30, DW_FRAME_REG31,
   /* 0 is for cfa. */
 };
+#endif
 
 /* for each fd register, a mapping to the corresponding spill ST */
 static ST *fd_to_spill_loc[FD_LAST];
@@ -406,9 +437,14 @@ update_state (
   }
 
   // for SL, return address reg can never change state
+#ifndef IRIX_FRAME
   if (fd_reg == FD_RA) {
     return fde;
   }
+#endif
+  // IRIX: a direct save of $31 (no copy in another register) is a
+  // rule for the return-address column like any other, or the unwinder
+  // reads a return address that $31 no longer holds.
 
   if (fd_reg == FD_CFA) {
     if ( new_state == DS_CFA_Is_SP ) {
@@ -551,6 +587,13 @@ static FD_REG Machine_Reg_To_FD (TN *tn, UINT32 mc_id, ISA_REGISTER_CLASS c)
   }
   return fd_num;
 
+#elif defined(IRIX_FRAME)
+  FD_REG fd_num = mc_id & 0x1f;
+  if (TN_is_float(tn))
+    fd_num = (mc_id >= 20 && mc_id <= 31) ? mc_id - 20 : 0;
+  else if (mc_id == 28)
+    fd_num = FD_IRIX_GP;
+  return fd_num;
 #else
   FD_REG fd_num;
   if (TN_is_float(tn)) {
@@ -915,7 +958,16 @@ Build_Fde_For_Proc (Dwarf_P_Debug dw_dbg, BB *firstbb, LABEL_IDX begin_label, LA
         fde = update_state (fde, FD_CFA, current_state, init_state);
       }
       /* update the state for all the callee-save regs */
+#ifdef IRIX_FRAME
+      // every slot but the CFA's: $30 and the return address (31) are
+      // above it, and after an early return's epilogue the next block
+      // must say again where they are saved
+      for ( fd_reg = FD_FIRST; fd_reg < FD_LAST; fd_reg++ ) {
+	if (fd_reg == FD_CFA)
+	  continue;
+#else
       for ( fd_reg = FD_FIRST; fd_reg < FD_CFA; fd_reg++ ) {
+#endif
 	if (fd_to_track[fd_reg] == 0)
 	  continue;
         init_state = (CGD_STATES) ((ENTRY_STATE(bb) >> fd_reg) & 1);
