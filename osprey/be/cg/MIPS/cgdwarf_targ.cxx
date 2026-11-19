@@ -31,6 +31,16 @@
 #include "pro_opaque.h"
 #include "pro_frame.h"
 #include "be_util.h"
+#include "eh_region.h"
+
+/* IRIX (MIPS, not SL): the frame description in the assembly is the one
+ * MIPSpro writes and IRIX's C++ runtime reads: code alignment 4, the
+ * return address in column DW_FRAME_RA_COL (in $31 at entry), and with
+ * a "z" CIE (C++) an augmentation field in each FDE holding the offset
+ * of the PU's range table in _MIPS_eh_region, or -1. */
+#if !defined(TARG_SL)
+#define IRIX_FRAME 1
+#endif
 
  #if !defined(TARG_SL)
  #define   FD_S0   0
@@ -172,11 +182,17 @@ static char *fmt_string = "\t%s\t0x%x\n";
 #define AS_SLEBW ".sleb128"
 
 static INT unw_info_pu_start_count;
+#ifdef IRIX_FRAME
+static BOOL irix_z_cie;		// the CIE is "z": FDEs carry the table offset
+#endif
 
 static void 
 CIE_dump2asm(Dwarf_P_Cie cie)
 {
   unw_info_pu_start_count = Current_PU_Count();
+#ifdef IRIX_FRAME
+  irix_z_cie = !strcmp(cie->cie_aug, "z");
+#endif
   // gas knows what attributes to give unwind sections
   fprintf(Asm_File, "\t%s\t%s\n", AS_SECTION, ".debug_frame,\"\",@progbits");
   fprintf(Asm_File, "$Lunwind_info_%d:\n", unw_info_pu_start_count);
@@ -189,9 +205,23 @@ CIE_dump2asm(Dwarf_P_Cie cie)
     fprintf(Asm_File, "\t%s\t\"%s\"\n", AS_ASCII, cie->cie_aug); 
   else
      fprintf(Asm_File, "\t%s \"\\000\"\n", ".ascii");
+#ifdef IRIX_FRAME
+  if (*(cie->cie_aug))	// the string's terminator (.ascii adds none)
+    fprintf(Asm_File, fmt_string, AS_1BYTE, 0);
+  fprintf(Asm_File, fmt_string, AS_ULEBW, cie->cie_code_align);
+  fprintf(Asm_File, "\t%s\t%d\n", AS_SLEBW, (int) cie->cie_data_align);
+  fprintf(Asm_File, fmt_string, AS_1BYTE, cie->cie_ret_reg);
+  if (!strcmp(cie->cie_aug, "z"))
+    fprintf(Asm_File, fmt_string, AS_ULEBW, 0);	// augmentation length
+  // at entry the return address is in $31
+  fprintf(Asm_File, fmt_string, AS_1BYTE, DW_CFA_register);
+  fprintf(Asm_File, fmt_string, AS_ULEBW, cie->cie_ret_reg);
+  fprintf(Asm_File, fmt_string, AS_ULEBW, 31);
+#else
   fprintf(Asm_File, fmt_string, AS_ULEBW, 1); 
   fprintf(Asm_File, fmt_string, AS_SLEBW, cie->cie_data_align); 
   fprintf(Asm_File, fmt_string, AS_1BYTE, cie->cie_ret_reg); 
+#endif
 	  
   Is_True(cie->cie_personality == 0, ("size does not account for personality != 0"));
   Is_True(cie->cie_next == 0, ("not the last cie"));
@@ -216,6 +246,20 @@ FDE_dump2asm(INT low_pc, INT high_pc)
   fprintf(Asm_File, "\t%s\t$Lunwind_info_%d\n", AS_4BYTE,unw_info_pu_start_count); // CIE_pointer
   fprintf(Asm_File, "\t%s\t%s\n", AS_4BYTE, Cur_PU_Name); // initial location
   fprintf(Asm_File, fmt_string, AS_4BYTE, high_pc-low_pc); // address_range
+#ifdef IRIX_FRAME
+  if (irix_z_cie) {
+    // augmentation: 4 bytes, the PU's range table (as an offset in
+    // _MIPS_eh_region once the assembler's relocation is made a
+    // section displacement) or -1 for none
+    ST *range = PU_has_exc_scopes(Get_Current_PU()) ? EH_Get_PU_Range_ST()
+						    : NULL;
+    fprintf(Asm_File, fmt_string, AS_ULEBW, 4);
+    if (range != NULL)
+      fprintf(Asm_File, "\t%s\t%s\n", AS_4BYTE, ST_name(range));
+    else
+      fprintf(Asm_File, fmt_string, AS_4BYTE, -1);
+  }
+#endif
 }
 
 static void 
@@ -237,6 +281,26 @@ FDE_end_dump2asm(void)
 static INT
 CFA_dump2asm(Dwarf_Small dw_op, Dwarf_Unsigned op1, Dwarf_Unsigned op2)
 {
+#ifdef IRIX_FRAME
+  if (dw_op == DW_CFA_offset && op1 > 0x3f) {
+    // a column above 63 (the return address's) needs the extended form
+    fprintf(Asm_File, fmt_string, AS_1BYTE, DW_CFA_offset_extended);
+    fprintf(Asm_File, fmt_string, AS_ULEBW, op1);
+    fprintf(Asm_File, fmt_string, AS_ULEBW, op2);
+    return 9;
+  }
+  if (dw_op == DW_CFA_offset) {
+    fprintf(Asm_File, fmt_string, AS_1BYTE, (dw_op & 0xc0) | (op1 & 0x3f));
+    fprintf(Asm_File, fmt_string, AS_ULEBW, op2);
+    return 9;
+  }
+  if (dw_op == DW_CFA_advance_loc || dw_op == DW_CFA_advance_loc4) {
+    // curloc counts two per instruction; the CIE's code alignment is 4
+    fprintf(Asm_File, fmt_string, AS_1BYTE, DW_CFA_advance_loc4);
+    fprintf(Asm_File, fmt_string, AS_4BYTE, op1 / 2);
+    return 5;
+  }
+#endif
   if (dw_op == DW_CFA_offset) {
     if (op1 != 35) {
 		dw_op = (dw_op & 0xc0) | ((Dwarf_Small)op1 & 0x1F);
@@ -593,6 +657,7 @@ static void Compute_Reg_State (BB *firstbb)
       if (OP_store(op) && TN_is_save_reg(OP_opnd(op,0))) {
         LOCAL_STATE(bb) |= 1 << Save_TN_to_fd(OP_opnd(op,0));
       }
+
 #if !defined(TARG_SL)
       // look for spill of static link
       if (PU_is_nested_func(Get_Current_PU()) && BB_entry(bb) && OP_store(op)) {
@@ -938,8 +1003,13 @@ Build_Fde_For_Proc (Dwarf_P_Debug dw_dbg, BB *firstbb, LABEL_IDX begin_label, LA
 		  // printf("store ra_sv\n");
 		  // extern void dump_st(ST *);
 		  // dump_st(TN_var(ra_sv));
+#ifdef IRIX_FRAME
+		  fde = Add_Fde_Inst(fde, DW_CFA_offset, DW_FRAME_RA_COL,
+		  	Offset_from_FP(TN_var(ra_sv))/data_alignment_factor);
+#else
 		  fde = Add_Fde_Inst(fde, DW_CFA_offset, fd_to_dwarf[FD_RA], 
 		  	Offset_from_FP(TN_var(ra_sv))/data_alignment_factor);
+#endif
 		  current_state[FD_RA] = DS_In_Memory;
 	  	}
 		else
