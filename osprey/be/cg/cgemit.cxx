@@ -7731,6 +7731,11 @@ Write_INITO (
         bool range_table = (name != NULL) &&
                 (!strncmp (".range_table.", name,strlen(".range_table."))) &&
                 (ST_sclass (sym) == SCLASS_EH_REGION);
+#if defined(TARG_MIPS) && !defined(TARG_SL)
+        // IRIX: the range table is MIPSpro's (eh_region.cxx), written
+        // as it is, with no GNU LSDA header or labels.
+        range_table = false;
+#endif
         LABEL_IDX labels[2];
         if (range_table)
         {
