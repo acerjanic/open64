@@ -303,7 +303,11 @@ Em_Dwarf_Begin (BOOL is_64bit, BOOL dwarf_trace, BOOL is_cplus,
 
   // Most of the following have been introduced at KEY, somehow the macro
   // got removed.
+#if defined(TARG_MIPS) && !defined(TARG_SL)
+  if (0)	/* IRIX: no GNU personality (below) */
+#else
   if (is_cplus)	/* may have eh info */
+#endif
   {
     	if (Gen_PIC_Call_Shared || Gen_PIC_Shared)
 	    augmenter = PIC_DW_CIE_AUGMENTER_STRING_V0;
@@ -377,6 +381,14 @@ Em_Dwarf_Begin (BOOL is_64bit, BOOL dwarf_trace, BOOL is_cplus,
       augmenter = PIC_NONCPLUS_DW_CIE_AUGMENTER_STRING_V0;
     else
       augmenter = "";
+
+#if defined(TARG_MIPS) && !defined(TARG_SL)
+  // IRIX: MIPSpro's C++ CIE is "z" with no personality: each FDE then
+  // carries the offset of its PU's range table in _MIPS_eh_region (or
+  // -1), which IRIX's C++ runtime reads.  Its C CIE has no
+  // augmentation, and no GNU personality symbols are made above.
+  augmenter = is_cplus ? "z" : "";
+#endif
 
   const char *cie_augmenter;
   Dwarf_Small code_alignent_factor;
