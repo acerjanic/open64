@@ -196,8 +196,16 @@ static BOOL Trace_Stack_Allocation = FALSE; /* Trace stack frame allocation */
  * the pu.  we do this in leaf routines if there are no regions
  * and gra will be run.
  */
+#if defined(TARG_MIPS) || defined(TARG_LOONGSON)
+/* MIPS keeps the gp in $gp even in a leaf routine (Setup_GP_TN_For_PU below), and
+ * $gp is callee-saved in n32 and n64: a leaf that sets up its own gp must
+ * save and restore its caller's, or a caller in another object (a program
+ * calling a DSO routine) continues with the DSO's gp. */
+#define Use_Scratch_GP(need_gp_setup) FALSE
+#else
 #define Use_Scratch_GP(need_gp_setup) \
 ((need_gp_setup) && !PU_Has_Calls && !PU_has_region(Get_Current_PU()))
+#endif
 
 /* ====================================================================
  *
