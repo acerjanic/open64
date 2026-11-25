@@ -101,3 +101,12 @@ table), which IRIX's C++ runtime reads. IRIX's `as` must then run with
 `-g0` (the assembly has its own `.debug_frame`), and Iridium's
 `tools/edg-whirl/open64/ehreloc` turns the table references into the
 section displacements (`R_MIPS_SCN_DISP`) IRIX's `as` cannot write.
+
+GNU `as` (the Open64 lane's step 4b): Iridium now assembles this
+branch's output with GNU binutils for `mips-sgi-irix6.5`, after
+`tools/edg-whirl/open64/gas-prep`, which marks the table references as
+`R_MIPS_SCN_DISP` relocations itself; `fix-asm` and `ehreloc` remain
+only for Iridium's `ECCW_ASM=irix` comparison path. The same step made
+a leaf routine that sets up `$gp` save and restore its caller's (n32
+makes `$gp` callee-saved), which calls from a program into a shared
+object built by this back end need.
