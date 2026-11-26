@@ -7517,6 +7517,123 @@ static void Expand_Statement (WN *stmt)
 }
 
 
+#ifdef TARG_MIPS
+// MIPSpro's atomic built-ins (__add_and_fetch and its relatives, which
+// IRIX code and the C++ libraries' reference counts use) as an ll/sc
+// loop, written as an asm statement so that the loop's registers are
+// allocated like any asm's and the sequence reaches the assembler
+// unchanged.  Each is a full barrier (sync before and after), as
+// MIPSpro's are; branch-likely, as MIPSpro's -TARG:t5_ll_sc_bug=on.
+// %0: the result, %1: scratch, %2: the address, %3 (%4): the values.
+static const char *
+MIPS_Atomic_Asm (INTRINSIC id, INT *nopnds)
+{
+  *nopnds = 2;
+  switch (id) {
+  case INTRN_ADD_AND_FETCH_I4:
+    return "sync\n1:\tll\t%1,0(%2)\n\taddu\t%1,%1,%3\n\tor\t%0,%1,$0\n"
+           "\tsc\t%1,0(%2)\n\tbeql\t%1,$0,1b\n\tnop\n\tsync";
+  case INTRN_ADD_AND_FETCH_I8:
+    return "sync\n1:\tlld\t%1,0(%2)\n\tdaddu\t%1,%1,%3\n\tor\t%0,%1,$0\n"
+           "\tscd\t%1,0(%2)\n\tbeql\t%1,$0,1b\n\tnop\n\tsync";
+  case INTRN_SUB_AND_FETCH_I4:
+    return "sync\n1:\tll\t%1,0(%2)\n\tsubu\t%1,%1,%3\n\tor\t%0,%1,$0\n"
+           "\tsc\t%1,0(%2)\n\tbeql\t%1,$0,1b\n\tnop\n\tsync";
+  case INTRN_SUB_AND_FETCH_I8:
+    return "sync\n1:\tlld\t%1,0(%2)\n\tdsubu\t%1,%1,%3\n\tor\t%0,%1,$0\n"
+           "\tscd\t%1,0(%2)\n\tbeql\t%1,$0,1b\n\tnop\n\tsync";
+  case INTRN_FETCH_AND_ADD_I4:
+    return "sync\n1:\tll\t%0,0(%2)\n\taddu\t%1,%0,%3\n"
+           "\tsc\t%1,0(%2)\n\tbeql\t%1,$0,1b\n\tnop\n\tsync";
+  case INTRN_FETCH_AND_ADD_I8:
+    return "sync\n1:\tlld\t%0,0(%2)\n\tdaddu\t%1,%0,%3\n"
+           "\tscd\t%1,0(%2)\n\tbeql\t%1,$0,1b\n\tnop\n\tsync";
+  case INTRN_FETCH_AND_SUB_I4:
+    return "sync\n1:\tll\t%0,0(%2)\n\tsubu\t%1,%0,%3\n"
+           "\tsc\t%1,0(%2)\n\tbeql\t%1,$0,1b\n\tnop\n\tsync";
+  case INTRN_FETCH_AND_SUB_I8:
+    return "sync\n1:\tlld\t%0,0(%2)\n\tdsubu\t%1,%0,%3\n"
+           "\tscd\t%1,0(%2)\n\tbeql\t%1,$0,1b\n\tnop\n\tsync";
+  case INTRN_LOCK_TEST_AND_SET_I4:
+    return "sync\n1:\tll\t%0,0(%2)\n\tor\t%1,%3,$0\n"
+           "\tsc\t%1,0(%2)\n\tbeql\t%1,$0,1b\n\tnop\n\tsync";
+  case INTRN_LOCK_TEST_AND_SET_I8:
+    return "sync\n1:\tlld\t%0,0(%2)\n\tor\t%1,%3,$0\n"
+           "\tscd\t%1,0(%2)\n\tbeql\t%1,$0,1b\n\tnop\n\tsync";
+  case INTRN_COMPARE_AND_SWAP_I4:
+    *nopnds = 3;
+    return "sync\n1:\tll\t%1,0(%2)\n\tbne\t%1,%3,2f\n\tor\t%0,$0,$0\n"
+           "\tor\t%1,%4,$0\n\tsc\t%1,0(%2)\n\tbeql\t%1,$0,1b\n\tnop\n"
+           "\tori\t%0,$0,1\n2:\tsync";
+  case INTRN_COMPARE_AND_SWAP_I8:
+    *nopnds = 3;
+    return "sync\n1:\tlld\t%1,0(%2)\n\tbne\t%1,%3,2f\n\tor\t%0,$0,$0\n"
+           "\tor\t%1,%4,$0\n\tscd\t%1,0(%2)\n\tbeql\t%1,$0,1b\n\tnop\n"
+           "\tori\t%0,$0,1\n2:\tsync";
+  default:
+    return NULL;
+  }
+}
+
+// Append the asm op for MIPS_Atomic_Asm's <text> and end the block, as
+// Handle_ASM does for an asm statement; return the result TN.
+static TN *
+Expand_MIPS_Atomic (INTRINSIC id, const char *text, INT nopnds, TN **opnd_tn)
+{
+  TYPE_ID mtype = (id == INTRN_ADD_AND_FETCH_I8 || id == INTRN_SUB_AND_FETCH_I8
+                   || id == INTRN_FETCH_AND_ADD_I8
+                   || id == INTRN_FETCH_AND_SUB_I8
+                   || id == INTRN_LOCK_TEST_AND_SET_I8
+                   || id == INTRN_COMPARE_AND_SWAP_I8) ? MTYPE_I8 : MTYPE_I4;
+  ASM_OP_ANNOT *asm_info = TYPE_PU_ALLOC(ASM_OP_ANNOT);
+  bzero(asm_info, sizeof(ASM_OP_ANNOT));
+  ASM_OP_wn(asm_info) = WN_CreateAsm_Stmt(0, (char *)text);
+
+  TN *res[2], *opnd[3];
+  res[0] = Build_TN_Of_Mtype(mtype);
+  res[1] = Build_TN_Of_Mtype(mtype);
+  for (INT i = 0; i < 2; i++) {
+    ASM_OP_result_constraint(asm_info)[i] = "=&r";
+    ASM_OP_result_subclass(asm_info)[i] = ISA_REGISTER_SUBCLASS_UNDEFINED;
+    ASM_OP_result_position(asm_info)[i] = i;
+    ASM_OP_result_clobber(asm_info)[i] = true;
+    ASM_OP_result_memory(asm_info)[i] = false;
+  }
+  for (INT i = 0; i < nopnds; i++) {
+    TN *tn = opnd_tn[i];
+    if (!TN_is_register(tn)) {
+      // a literal: put it in a register, as the asm reads one
+      TN *r = Build_TN_Of_Mtype(i == 0 ? Pointer_Mtype : mtype);
+      Exp_Immediate(r, tn, FALSE, &New_OPs);
+      tn = r;
+    }
+    opnd[i] = tn;
+    ASM_OP_opnd_constraint(asm_info)[i] = "r";
+    ASM_OP_opnd_subclass(asm_info)[i] = ISA_REGISTER_SUBCLASS_UNDEFINED;
+    ASM_OP_opnd_position(asm_info)[i] = 2 + i;
+    ASM_OP_opnd_memory(asm_info)[i] = false;
+  }
+  OP *asm_op = Mk_VarOP(TOP_asm, 2, nopnds, res, opnd);
+  Set_OP_volatile(asm_op);
+  OPS_Append_Op(&New_OPs, asm_op);
+  OP_MAP_Set(OP_Asm_Map, asm_op, asm_info);
+
+  // the block's ASMINFO (Handle_ASM's, bug 14636): no clobbers, and the
+  // TNs have no registers yet, so the sets are empty
+  ASMINFO *asm_bb_info = TYPE_PU_ALLOC(ASMINFO);
+  bzero(asm_bb_info, sizeof(ASMINFO));
+  ISA_REGISTER_CLASS rc;
+  FOR_ALL_ISA_REGISTER_CLASS(rc) {
+    ASMINFO_livein(asm_bb_info)[rc] = REGISTER_SET_EMPTY_SET;
+    ASMINFO_liveout(asm_bb_info)[rc] = REGISTER_SET_EMPTY_SET;
+    ASMINFO_kill(asm_bb_info)[rc] = REGISTER_SET_EMPTY_SET;
+  }
+  BB_Add_Annotation(Cur_BB, ANNOT_ASMINFO, asm_bb_info);
+  Start_New_Basic_Block ();
+  return res[0];
+}
+#endif
+
 WN *
 Handle_INTRINSIC_CALL (WN *intrncall)
 {
@@ -7596,6 +7713,13 @@ Handle_INTRINSIC_CALL (WN *intrncall)
 
   OPS_Init(&loop_ops);
   current_srcpos = WN_Get_Linenum (intrncall);
+#ifdef TARG_MIPS
+  INT atomic_nopnds;
+  const char *atomic = MIPS_Atomic_Asm(id, &atomic_nopnds);
+  if (atomic != NULL) {
+    result = Expand_MIPS_Atomic(id, atomic, atomic_nopnds, opnd_tn);
+  } else
+#endif
   result = Exp_Intrinsic_Call (id, 
 	opnd_tn[0], opnd_tn[1], opnd_tn[2], &New_OPs, &label, &loop_ops);
 
