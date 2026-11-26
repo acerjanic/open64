@@ -110,3 +110,10 @@ only for Iridium's `ECCW_ASM=irix` comparison path. The same step made
 a leaf routine that sets up `$gp` save and restore its caller's (n32
 makes `$gp` callee-saved), which calls from a program into a shared
 object built by this back end need.
+
+Atomic built-ins (Iridium's Open64 step 3): MIPSpro's `__add_and_fetch`,
+`__sub_and_fetch`, `__fetch_and_add`, `__fetch_and_sub`,
+`__lock_test_and_set` and `__compare_and_swap` (4 and 8 bytes) become an
+ll/sc loop between two `sync`s on MIPS, written as an asm op in
+`be/cg/whirl2ops.cxx`; `__lock_release` and `__synchronize` were already
+expanded in `be/cg/MIPS/expand.cxx`.
