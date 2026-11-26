@@ -4367,6 +4367,11 @@ traverse_struct (const TY_IDX ty)
   Is_True (TY_size(ty) <= 8, ("Type size cannot exceed 8"));
   if (TY_kind (ty) == KIND_STRUCT)
   {
+    // a struct with no fields (an empty C++ class, such as an empty
+    // base) has no FP field; its TY_fld is the null handle, which
+    // Make_fld_iter would walk from the field table's first entry
+    if (TY_fld (ty).Is_Null ())
+      return 1;
     FLD_ITER fld_iter = Make_fld_iter(TY_fld(ty));
     do
     {
