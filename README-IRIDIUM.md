@@ -117,3 +117,11 @@ Atomic built-ins (Iridium's Open64 step 3): MIPSpro's `__add_and_fetch`,
 ll/sc loop between two `sync`s on MIPS, written as an asm op in
 `be/cg/whirl2ops.cxx`; `__lock_release` and `__synchronize` were already
 expanded in `be/cg/MIPS/expand.cxx`.
+
+Also from step 3, found running STLport's library on IRIX: an n32
+struct returned in integer registers has a last part shorter than a
+register left-justified, as MIPSpro passes and returns it
+(`be/com/wn_lower.cxx`); and cross-iteration write removal
+(`be/cg/cio_rwtran.cxx`) keeps SGI's guard on MIPS, removing writes only
+when the trip count is known, since without it a store sunk out of a
+loop at `-O2` went through the wrong base register.
