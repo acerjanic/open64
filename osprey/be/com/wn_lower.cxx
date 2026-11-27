@@ -7389,6 +7389,40 @@ static TYPE_ID adjust_type_for_return_info(TYPE_ID& rtype, INT32 size)
   return desc;
 }
 
+#ifdef TARG_MIPS
+// n32 and n64 return a struct in integer registers left-justified, as
+// they pass one (big-endian MIPS): a last part shorter than the register
+// (the word at offset 8 of a 12-byte struct) is in the register's high
+// bits, as MIPSpro has it.  The callee shifts the part up, the caller
+// down.  Iridium's Open64 lane, step 3.
+static BOOL Left_Justify_Return_Part(TYPE_ID mtype, TYPE_ID desc)
+{
+  return Target_Byte_Sex == BIG_ENDIAN && MTYPE_is_integral(mtype) &&
+         MTYPE_is_integral(desc) &&
+         MTYPE_byte_size(desc) < MTYPE_byte_size(mtype);
+}
+
+static WN *Return_Part_Up(TYPE_ID mtype, TYPE_ID desc, WN *val)
+{
+  if (!Left_Justify_Return_Part(mtype, desc))
+    return val;
+  INT shift = 8 * (MTYPE_byte_size(mtype) - MTYPE_byte_size(desc));
+  return WN_Shl(mtype, val, WN_Intconst(MTYPE_I4, shift));
+}
+
+static WN *Return_Part_Down(TYPE_ID mtype, TYPE_ID desc, PREG_NUM preg,
+                            ST *preg_st)
+{
+  if (!Left_Justify_Return_Part(mtype, desc))
+    return WN_CreateLdid(OPR_LDID, mtype, desc, preg, preg_st,
+                         Be_Type_Tbl(mtype));
+  INT shift = 8 * (MTYPE_byte_size(mtype) - MTYPE_byte_size(desc));
+  WN *whole = WN_CreateLdid(OPR_LDID, mtype, mtype, preg, preg_st,
+                            Be_Type_Tbl(mtype));
+  return WN_Lshr(mtype, whole, WN_Intconst(MTYPE_I4, shift));
+}
+#endif
+
 /* ====================================================================
  *
  * WN *lower_return_mstid(WN *block, WN *tree, LOWER_ACTIONS actions)
@@ -7447,9 +7481,14 @@ static WN *lower_return_mstid(WN *block, WN *tree, LOWER_ACTIONS actions)
       mtype = RETURN_INFO_mtype(return_info, i);
       desc = adjust_type_for_return_info(mtype, TY_size(ty_idx) - copied);
       preg_st = Standard_Preg_For_Mtype(mtype);
+#ifdef TARG_MIPS
+      n_rhs = Return_Part_Down(mtype, desc, RETURN_INFO_preg(return_info, i),
+                               preg_st);
+#else
       n_rhs = WN_CreateLdid(OPR_LDID, mtype, desc, 
 			    RETURN_INFO_preg(return_info, i), preg_st,
 			    Be_Type_Tbl(mtype));
+#endif
 #ifndef KEY
       if (TY_align(ST_type(WN_st(tree))) < MTYPE_alignment(mtype)) {
 	DevWarn("return_info struct alignment is smaller than register size, may produce wrong results");
@@ -7525,9 +7564,14 @@ static WN *lower_return_mistore(WN *block, WN *tree, LOWER_ACTIONS actions)
       mtype = RETURN_INFO_mtype(return_info, i);
       TYPE_ID desc = adjust_type_for_return_info(mtype, TY_size(ty_idx) - copied);
       preg_st = Standard_Preg_For_Mtype(mtype);
+#ifdef TARG_MIPS
+      n_rhs = Return_Part_Down(mtype, desc, RETURN_INFO_preg(return_info, i),
+                               preg_st);
+#else
       n_rhs = WN_CreateLdid(OPR_LDID, mtype, desc, 
 			    RETURN_INFO_preg(return_info, i), preg_st,
 			    Be_Type_Tbl(mtype));
+#endif
       base_expr = WN_COPY_Tree(WN_kid1(tree));
 // OSP-438: The type of Istore node should be a pointer to mtype.
 // (Previously, we just use Be_Type_Tbl(mtype) as the type of Istore).
@@ -12537,15 +12581,28 @@ static WN *lower_return_val(WN *block, WN *tree, LOWER_ACTIONS actions)
           preg_st = Standard_Preg_For_Mtype(mtype);
           TYPE_ID desc = adjust_type_for_return_info(mtype, TY_size(ty_idx) - copied);  
 
-  	  if (WN_opcode(o_rhs) == OPC_MMLDID && WN_st(o_rhs) == Return_Val_Preg)
+          BOOL from_preg = WN_opcode(o_rhs) == OPC_MMLDID &&
+                           WN_st(o_rhs) == Return_Val_Preg;
+  	  if (from_preg)
+#ifdef TARG_MIPS
+            // a callee's result passed on as it came: the whole register,
+            // already left-justified
+            n_rhs = WN_CreateLdid(OPR_LDID, mtype, mtype, preg, preg_st,
+			          Be_Type_Tbl(mtype));
+#else
             n_rhs = WN_CreateLdid(OPR_LDID, mtype, desc, preg, preg_st, 
 			          Be_Type_Tbl(mtype));
+#endif
 	  else
             n_rhs = WN_CreateLdid (OPR_LDID, mtype, desc, 
 				   WN_load_offset(o_rhs) + copied,
 				   WN_st_idx(o_rhs), ty_idx_used);
 
           copied += MTYPE_byte_size(desc);
+#ifdef TARG_MIPS
+	  if (!from_preg)
+	    n_rhs = Return_Part_Up(mtype, desc, n_rhs);
+#endif
 	  wn = WN_CreateStid(OPR_STID, MTYPE_V, mtype, preg, preg_st, 
 			     Be_Type_Tbl(mtype), n_rhs);
 	  WN_Set_Linenum(wn, current_srcpos);  // Bug 1268
@@ -12572,6 +12629,9 @@ static WN *lower_return_val(WN *block, WN *tree, LOWER_ACTIONS actions)
 				 Make_Pointer_Type(ty_idx_used), n_rhs);
           copied += MTYPE_byte_size(desc);
 	  n_rhs = lower_expr(block, n_rhs, actions);
+#ifdef TARG_MIPS
+	  n_rhs = Return_Part_Up(mtype, desc, n_rhs);
+#endif
 	  preg    = RETURN_INFO_preg (return_info, i);
           preg_st = Standard_Preg_For_Mtype(mtype);
 	  wn = WN_CreateStid(OPR_STID, MTYPE_V, mtype, preg, preg_st, 
@@ -12599,6 +12659,9 @@ static WN *lower_return_val(WN *block, WN *tree, LOWER_ACTIONS actions)
 				 Make_Pointer_Type(ty_idx_used), n_rhs);
           copied += MTYPE_byte_size(desc);
 	  n_rhs = lower_expr(block, n_rhs, actions);
+#ifdef TARG_MIPS
+	  n_rhs = Return_Part_Up(mtype, desc, n_rhs);
+#endif
 	  preg    = RETURN_INFO_preg (return_info, i);
           preg_st = Standard_Preg_For_Mtype(mtype);
 	  wn = WN_CreateStid(OPR_STID, MTYPE_V, mtype, preg, preg_st, 
