@@ -3347,7 +3347,11 @@ CIO_RWTRAN::Write_Removal( BB *body )
   // Until the alternate predication code is ready, only remove writes
   // if the trip count is a known constant value, or if predication is
   // available on this target.
-#ifndef KEY
+  // MIPS cannot predicate, and with the trip count unknown the epilog
+  // copies of the removed stores are wrong: a store sunk out of
+  // STLport's _Stl_atod loop stored through the trip-count register
+  // (Iridium's Open64 step 3).  Keep the guard there.
+#if !defined(KEY) || defined(TARG_MIPS)
   if ( ! TN_has_value( _trip_count_tn ) && ! CGTARG_Can_Predicate() ) {
 #else
   if ( 0 ) {
